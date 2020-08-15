@@ -195,6 +195,15 @@ module Isucari
         db.xquery('SELECT * FROM `users` WHERE `id` = ?', user_id).first
       end
 
+      def get_users
+        users = b.xquery('SELECT * FROM `users` WHERE `id` = ?')
+
+        user_hash = {}
+        users.each do |user|
+          user_hash[user.id] = user
+        end
+        return user_hash
+
       def get_user_simple_by_id(user_id)
         user = db.xquery('SELECT * FROM `users` WHERE `id` = ?', user_id).first
 
@@ -286,8 +295,10 @@ module Isucari
         db.xquery("SELECT * FROM `items` WHERE `status` IN (?, ?) ORDER BY `created_at` DESC, `id` DESC LIMIT #{ITEMS_PER_PAGE + 1}", ITEM_STATUS_ON_SALE, ITEM_STATUS_SOLD_OUT)
       end
 
+      users_hash = get_users
+
       item_simples = items.map do |item|
-        seller = get_user_simple_by_id(item['seller_id'])
+        seller = users_hash[item['seller_id']]
         halt_with_error 404, 'seller not found' if seller.nil?
 
         category = get_category_by_id(item['category_id'])
@@ -403,8 +414,10 @@ module Isucari
         end
       end
 
+      users_hash = get_users
+
       item_details = items.map do |item|
-        seller = get_user_simple_by_id(item['seller_id'])
+        seller = users_hash[item['seller_id']]
         if seller.nil?
           db.query('ROLLBACK')
           halt_with_error 404, 'seller not found'
@@ -436,7 +449,7 @@ module Isucari
         }
 
         if item['buyer_id'] != 0
-          buyer = get_user_simple_by_id(item['buyer_id'])
+          buyer = users_hash[item['buyer_id']]
           if buyer.nil?
             db.query('ROLLBACK')
             halt_with_error 404, 'buyer not found'
@@ -505,8 +518,10 @@ module Isucari
         db.xquery("SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN (?, ?, ?) ORDER BY `created_at` DESC, `id` DESC LIMIT #{ITEMS_PER_PAGE + 1}", user_simple['id'], ITEM_STATUS_ON_SALE, ITEM_STATUS_TRADING, ITEM_STATUS_SOLD_OUT)
       end
 
+      users_hash = get_users
+
       item_simples = items.map do |item|
-        seller = get_user_simple_by_id(item['seller_id'])
+        seller = users_hash[item['seller_id']]
         halt_with_error 404, 'seller not found' if seller.nil?
 
         category = get_category_by_id(item['category_id'])

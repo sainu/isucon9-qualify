@@ -7,6 +7,28 @@ require 'mysql2-cs-bind'
 require 'bcrypt'
 require 'isucari/api'
 
+# see https://github.com/shirokanezoo/isucon9f/commit/db8ef5934666fde3e23c17a04c4394b12a343110#diff-e90610944058d63767be863ddbd31bfd
+class NRMysql2Client < Mysql2::Client
+  def initialize(*args)
+    super
+  end
+
+  def query(sql, *args)
+    if ENV['LOCAL']
+      puts sql
+      puts caller(0)[1]
+    end
+    callback = -> (result, metrics, elapsed) do
+      NewRelic::Agent::Datastores.notice_sql(sql, metrics, elapsed)
+    end
+    op = sql[/^(select|insert|update|delete|begin|commit|rollback)/i] || 'other'
+    table = sql[/\bcategories|configs|items|shippings|transaction_evidences|users|user_stats\b/] || 'other'
+    NewRelic::Agent::Datastores.wrap('MySQL', op, table, callback) do
+      super
+    end
+  end
+end
+
 module Isucari
   class Web < Sinatra::Base
     DEFAULT_PAYMENT_SERVICE_URL = 'http://localhost:5555'
@@ -54,7 +76,7 @@ module Isucari
 
     helpers do
       def db
-        Thread.current[:db] ||= Mysql2::Client.new(
+        Thread.current[:db] ||= NRMysql2Client.new(
           'host' => ENV['MYSQL_HOST'] || '127.0.0.1',
           'port' => ENV['MYSQL_PORT'] || '3306',
           'database' => ENV['MYSQL_DBNAME'] || 'isucari',
@@ -151,7 +173,6 @@ module Isucari
 
       ['payment_service_url', 'shipment_service_url'].each do |name|
         value = body_params[name].gsub('localhost', 'host.docker.internal')
-
         db.xquery('INSERT INTO `configs` (name, val) VALUES (?, ?) ON DUPLICATE KEY UPDATE `val` = VALUES(`val`)', name, value)
       end
 

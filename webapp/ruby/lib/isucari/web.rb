@@ -203,6 +203,7 @@ module Isucari
           user_hash[user.id] = user
         end
         return user_hash
+      end
 
       def get_user_simple_by_id(user_id)
         user = db.xquery('SELECT * FROM `users` WHERE `id` = ?', user_id).first

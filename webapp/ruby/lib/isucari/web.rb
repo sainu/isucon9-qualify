@@ -252,10 +252,6 @@ module Isucari
 
     # postInitialize
     post '/initialize' do
-      unless system "#{settings.root}/../sql/init.sh"
-        halt_with_error 500, 'exec init.sh error'
-      end
-
       ['payment_service_url', 'shipment_service_url'].each do |name|
         value = body_params[name].gsub('localhost', 'host.docker.internal')
         db.xquery('INSERT INTO `configs` (name, val) VALUES (?, ?) ON DUPLICATE KEY UPDATE `val` = VALUES(`val`)', name, value)

@@ -31,5 +31,6 @@ services:
       - ./docker/db/my.cnf:/etc/mysql/conf.d/my.cnf
       - ./docker/db/sql:/docker-entrypoint-initdb.d
       - ../sql:/sql
+      - ./migrations:/migrations
     ports:
       - 3306:3306

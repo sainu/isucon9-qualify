@@ -200,7 +200,7 @@ module Isucari
 
         user_hash = {}
         users.each do |user|
-          user_hash[user.id] = user
+          user_hash[user['id'] ] = user
         end
         return user_hash
       end

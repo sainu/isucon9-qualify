@@ -5,6 +5,7 @@ require 'newrelic_rpm'
 require 'mysql2'
 require 'mysql2-cs-bind'
 require 'bcrypt'
+require "digest"
 require 'isucari/api'
 
 # see https://github.com/shirokanezoo/isucon9f/commit/db8ef5934666fde3e23c17a04c4394b12a343110#diff-e90610944058d63767be863ddbd31bfd
@@ -1258,7 +1259,7 @@ module Isucari
 
       user = db.xquery('SELECT * FROM `users` WHERE `account_name` = ?', account_name).first
 
-      if user.nil? || BCrypt::Password.new(user['hashed_password']) != password
+      if user.nil? || !PasswordVerification.new.verify(db, user, password)
         halt_with_error 401, 'アカウント名かパスワードが間違えています'
       end
 
@@ -1278,10 +1279,10 @@ module Isucari
         halt_with_error 500, 'all parameters are required'
       end
 
-      hashed_password = BCrypt::Password.create(password, 'cost' => BCRYPT_COST)
-
-      db.xquery('INSERT INTO `users` (`account_name`, `hashed_password`, `address`) VALUES (?, ?, ?)', account_name, hashed_password, address)
+      db.xquery('INSERT INTO `users` (`account_name`, `address`) VALUES (?, ?, ?)', account_name, address)
       user_id = db.last_id
+
+      PasswordVerification.register(db, user, password)
 
       user = {
         'id' => user_id,
@@ -1382,5 +1383,38 @@ module Isucari
     error JSON::ParserError do
       { 'error' => 'json decode error' }.to_json
     end
+  end
+end
+
+class PasswordVerification
+  def register(db, user, input_plain)
+    hashed_sha256 = to_sha(input_plain)
+    save_password(db, user['id'], hashed_sha256)
+  end
+
+  def verify(db, user, input_plain)
+    hashed = Digest::SHA2.hexdigest("#{SALT} #{input_plain}")
+
+    password_record = db.xquery('SELECT * FROM `passwords` WHERE `user_id` = ?', user['id']).first
+    return hashed == password_record['hashed_sha256'] if password_record if password_record
+
+    return false if BCrypt::Password.new(user['hashed_password']) != input_plain
+
+    hashed_sha256 = to_sha(input_plain)
+    save_password(db, user['id'], hashed)
+
+    true
+  end
+
+  private
+
+  SALT = 'foobar_'
+
+  def to_sha(plain)
+    Digest::SHA2.hexdigest("#{SALT} #{plain}")
+  end
+
+  def save_password(db, user_id, hashed)
+    db.xquery('INSERT INTO `passwords` (user_id, hashed_sha256) VALUES (?, ?)', user_id, hashed)
   end
 end

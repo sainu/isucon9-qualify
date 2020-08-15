@@ -196,7 +196,7 @@ module Isucari
       end
 
       def get_users
-        users = b.xquery('SELECT * FROM `users` WHERE `id` = ?')
+        users = b.xquery('SELECT * FROM `users` ')
 
         user_hash = {}
         users.each do |user|

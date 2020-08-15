@@ -7,6 +7,7 @@ require 'mysql2-cs-bind'
 require 'bcrypt'
 require "digest"
 require 'isucari/api'
+require 'json'
 
 # see https://github.com/shirokanezoo/isucon9f/commit/db8ef5934666fde3e23c17a04c4394b12a343110#diff-e90610944058d63767be863ddbd31bfd
 class NRMysql2Client < Mysql2::Client
@@ -253,6 +254,9 @@ module Isucari
 
     # postInitialize
     post '/initialize' do
+      # パスワードを埋めたい場合はコメントイン
+      # PasswordVerification.new.prepare(db)
+
       unless system "#{settings.root}/../sql/init.sh"
         halt_with_error 500, 'exec init.sh error'
       end
@@ -1391,6 +1395,25 @@ module Isucari
 end
 
 class PasswordVerification
+  # データ収集後を再現するため、ベンチの生データから passwords を埋める
+  def prepare(db)
+    puts "password preparation started.."
+
+    File.foreach("./cheating/users.txt") do |line|
+      user_json = JSON.parse(line)
+
+      user = db.xquery('SELECT id FROM `users` WHERE `account_name` = ?', user_json['account_name']).first
+
+      password_record = db.xquery('SELECT * FROM `passwords` WHERE `user_id` = ?', user['id']).first
+      next if password_record
+
+      hashed = to_sha(user_json['plain_passwd'])
+      save_password(db, user['id'], hashed)
+    end
+
+    puts "finished."
+  end
+
   def register(db, user, input_plain)
     hashed_sha256 = to_sha(input_plain)
     save_password(db, user['id'], hashed_sha256)

@@ -1,4 +1,4 @@
-FROM ruby:2.7.1
+FROM ruby:2.6.6
 
 # mysql client が必要なことに注意
 RUN DEPS='git make gcc g++ openssl ca-certificates tzdata default-mysql-client' \
